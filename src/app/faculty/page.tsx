@@ -1,5 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
+import Navbar from "@/components/Navbar";
 
 // --- FACULTY DATA ---
 const teachers = [
@@ -51,26 +52,7 @@ export default function Faculty() {
   return (
     <div className="min-h-screen flex flex-col bg-white text-gray-900 font-sans">
       
-      {/* --- NAVBAR --- */}
-      <header className="w-full border-b border-gray-200 sticky top-0 bg-white/80 backdrop-blur-md z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Link href="/" className="flex items-center gap-2">
-                <Image src="/logo.svg" alt="Vishwaas Logo" width={40} height={40} />
-                <span className="text-xl font-bold text-blue-900 tracking-tight">Vishwaas Academy</span>
-            </Link>
-          </div>
-          <nav className="hidden md:flex gap-8 text-sm font-medium text-gray-600">
-            <Link href="/about" className="hover:text-blue-600 transition">About</Link>
-            <Link href="#" className="hover:text-blue-600 transition">Courses</Link>
-            <Link href="/faculty" className="text-blue-600 font-semibold">Faculty</Link>
-            <Link href="/contact" className="hover:text-blue-600 transition">Contact</Link>
-          </nav>
-          <button className="bg-blue-600 text-white px-5 py-2 rounded-full text-sm font-medium hover:bg-blue-700 transition">
-            Student Login
-          </button>
-        </div>
-      </header>
+      <Navbar />
 
       {/* --- HERO SECTION --- */}
       <main className="flex-grow bg-slate-50">

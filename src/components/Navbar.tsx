@@ -10,7 +10,7 @@ export default function Navbar() {
 
   const navLinks = [
     { name: "About", href: "/about" },
-    { name: "Courses", href: "#" },
+    { name: "Courses", href: "/courses" },
     { name: "Faculty", href: "/faculty" },
     { name: "Contact", href: "/contact" },
   ];
@@ -22,7 +22,7 @@ export default function Navbar() {
         {/* LOGO */}
         <div className="flex items-center gap-2">
           <Link href="/" className="flex items-center gap-2">
-            <Image src="/logo.svg" alt="Vishwaas Logo" width={40} height={40} />
+            <Image src="/logo.jpg" alt="Vishwaas Logo" width={40} height={40} />
             <span className="text-xl font-bold text-blue-900 tracking-tight">Vishwaas Academy</span>
           </Link>
         </div>
