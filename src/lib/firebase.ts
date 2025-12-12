@@ -5,13 +5,13 @@ import { getFirestore } from "firebase/firestore";
 // --- PASTE YOUR FIREBASE KEYS BELOW ---
 // (You copied these from the Firebase Console earlier)
 const firebaseConfig = {
-  apiKey: "AIzaSyBsh7YTH_rvjygHhODCJjmHgHMF7zDU5SA",
-  authDomain: "vishwaas-academy.firebaseapp.com",
-  projectId: "vishwaas-academy",
-  storageBucket: "vishwaas-academy.firebasestorage.app",
-  messagingSenderId: "430633643742",
-  appId: "1:430633643742:web:a97bb0f235ed151d685c4f",
-  measurementId: "G-QDMWG7J6X9"
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+  measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID
 };
 // Initialize Firebase (Prevents errors if it's already running)
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
