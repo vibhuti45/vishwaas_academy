@@ -63,8 +63,18 @@ export default function Home() {
 
       {/* --- FOOTER --- */}
       <footer className="bg-white border-t border-slate-200 py-12">
-        <div className="max-w-7xl mx-auto px-4 text-center text-slate-500 text-sm">
+        <div className="max-w-7xl mx-auto px-4 flex flex-col md:flex-row justify-between items-center gap-4 text-slate-500 text-sm">
           <p>&copy; {new Date().getFullYear()} Vishwaas Academy. All rights reserved.</p>
+          
+          <div className="flex gap-6">
+            <Link href="/admin/login" className="hover:text-red-600 font-semibold">
+              Admin Login
+            </Link>
+            {/* NEW LINK ADDED HERE */}
+            <Link href="/faculty/login" className="hover:text-blue-600 font-semibold">
+              Faculty Login
+            </Link>
+          </div>
         </div>
       </footer>
 

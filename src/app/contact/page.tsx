@@ -65,7 +65,7 @@ export default function Contact() {
                         </div>
                         <div className="flex items-center gap-4">
                             <span className="text-2xl">📞</span>
-                            <p>+91 7324962717</p>
+                            <p>+91 7324962717, +91 6202834185</p>
                         </div>
                     </div>
                 </div>
