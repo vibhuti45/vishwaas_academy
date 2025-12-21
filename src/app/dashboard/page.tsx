@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, getDoc, collection, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import Image from "next/image";
 import Link from "next/link";
@@ -12,6 +12,7 @@ export default function StudentDashboard() {
   const router = useRouter();
   const [studentName, setStudentName] = useState("");
   const [studentGrade, setStudentGrade] = useState("");
+  const [enrolledCourses, setEnrolledCourses] = useState<any[]>([]); // New state for courses
 
   // 1. PROTECT THE ROUTE
   useEffect(() => {
@@ -20,23 +21,48 @@ export default function StudentDashboard() {
     }
   }, [user, loading, router]);
 
-  // 2. FETCH EXTRA DETAILS (Name, Grade)
+  // 2. FETCH USER DETAILS & COURSES
+  // ... inside StudentDashboard component
+
   useEffect(() => {
-    if (user?.uid) {
-      const fetchUserData = async () => {
+    const fetchData = async () => {
+      if (user?.uid) {
+        // A. Fetch User Profile to get 'enrolledCourseIds'
         const docRef = doc(db, "users", user.uid);
         const docSnap = await getDoc(docRef);
+        
         if (docSnap.exists()) {
-          setStudentName(docSnap.data().name);
-          setStudentGrade(docSnap.data().grade);
+          const userData = docSnap.data();
+          setStudentName(userData.name || user.displayName || "Student");
+          setStudentGrade(userData.grade);
+
+          // B. CHECK ENROLLMENT
+          const enrolledIds = userData.enrolledCourseIds || []; // e.g. ["courseA", "courseB"]
+
+          if (enrolledIds.length > 0) {
+            // Fetch ONLY the courses present in that list
+            // (Note: Firestore 'in' query supports max 10 items. For loops are safer for MVP)
+            const myCourses: any[] = [];
+            for (const courseId of enrolledIds) {
+                const courseDoc = await getDoc(doc(db, "courses", courseId));
+                if (courseDoc.exists()) {
+                    myCourses.push({ id: courseDoc.id, ...courseDoc.data() });
+                }
+            }
+            setEnrolledCourses(myCourses);
+          } else {
+            setEnrolledCourses([]); // No enrollments
+          }
         }
-      };
-      fetchUserData();
-    }
+      }
+    };
+
+    if (user) fetchData();
   }, [user]);
 
+  
   if (loading) return <div className="min-h-screen flex items-center justify-center text-blue-600 font-bold">Loading Classroom...</div>;
-  if (!user) return null; // Don't show anything while redirecting
+  if (!user) return null; 
 
   return (
     <div className="min-h-screen bg-slate-50 flex">
@@ -73,7 +99,7 @@ export default function StudentDashboard() {
       {/* --- MAIN CONTENT AREA --- */}
       <main className="flex-grow md:ml-64 min-h-screen">
         
-        {/* Mobile Header (Only visible on phone) */}
+        {/* Mobile Header */}
         <div className="md:hidden bg-white p-4 flex justify-between items-center border-b border-slate-200 sticky top-0 z-20">
             <span className="font-bold text-slate-900">Vishwaas Academy</span>
             <button onClick={logout} className="text-sm text-red-600 font-medium">Logout</button>
@@ -82,15 +108,17 @@ export default function StudentDashboard() {
         <div className="p-8">
             {/* Welcome Header */}
             <div className="mb-8">
-                <h1 className="text-3xl font-bold text-slate-900">Welcome back, {studentName}! 👋</h1>
-                <p className="text-slate-600 mt-1">You are studying in <span className="font-semibold text-blue-600">{studentGrade}</span>.</p>
+                <h1 className="text-3xl font-bold text-slate-900">
+                    Welcome back, {studentName.split(' ')[0]}! 👋
+                </h1>
+                <p className="text-slate-600 mt-1">You are studying in <span className="font-semibold text-blue-600">{studentGrade || "Class 10"}</span>.</p>
             </div>
 
             {/* Stats Grid */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
                 <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
                     <h3 className="text-slate-500 text-sm font-medium uppercase">Enrolled Courses</h3>
-                    <p className="text-3xl font-bold text-slate-900 mt-2">1</p>
+                    <p className="text-3xl font-bold text-slate-900 mt-2">{enrolledCourses.length}</p>
                 </div>
                 <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
                     <h3 className="text-slate-500 text-sm font-medium uppercase">Classes Watched</h3>
@@ -107,33 +135,50 @@ export default function StudentDashboard() {
             
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
                 
-                {/* --- DEMO COURSE CARD --- */}
-                {/* Later we will map through real enrolled courses here */}
-                <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-md transition group cursor-pointer">
-                    <div className="h-40 bg-blue-600 relative flex items-center justify-center">
-                        <span className="text-4xl">📐</span>
-                        {/* Overlay Play Button */}
-                        <div className="absolute inset-0 bg-black/10 group-hover:bg-black/20 transition flex items-center justify-center">
-                            <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center pl-1 shadow-lg">
-                                <svg className="w-5 h-5 text-blue-600" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                {/* --- REAL FETCHED COURSES --- */}
+                {enrolledCourses.length > 0 ? (
+                    enrolledCourses.map((course) => (
+                        <div key={course.id} className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-md transition group cursor-pointer flex flex-col">
+                            {/* Thumbnail Area */}
+                            <div className="h-40 bg-slate-200 relative">
+                                {course.thumbnail ? (
+                                    <Image src={course.thumbnail} alt={course.title} fill className="object-cover" />
+                                ) : (
+                                    <div className="w-full h-full flex items-center justify-center bg-blue-100 text-blue-300 text-4xl">📚</div>
+                                )}
+                                
+                                {/* Overlay Play Button */}
+                                <Link href={`/classroom/${course.id}`} className="absolute inset-0 bg-black/10 group-hover:bg-black/20 transition flex items-center justify-center">
+                                    <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center pl-1 shadow-lg transform group-hover:scale-110 transition">
+                                        <svg className="w-5 h-5 text-blue-600" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                                    </div>
+                                </Link>
+                            </div>
+
+                            <div className="p-6 flex flex-col flex-grow">
+                                <div>
+                                    <span className="text-xs font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded uppercase tracking-wider">{course.grade}</span>
+                                    <h3 className="text-lg font-bold text-slate-900 mt-3 mb-2 line-clamp-1">{course.title}</h3>
+                                    <p className="text-sm text-slate-500 line-clamp-2 mb-4">{course.description}</p>
+                                </div>
+                                
+                                <div className="mt-auto">
+                                    <Link href={`/classroom/${course.id}`}>
+                                        <button className="w-full bg-slate-900 text-white text-sm font-semibold py-3 rounded-lg hover:bg-blue-600 transition">
+                                            Continue Learning
+                                        </button>
+                                    </Link>
+                                </div>
                             </div>
                         </div>
+                    ))
+                ) : (
+                    <div className="col-span-full text-center py-10 text-slate-500">
+                        No courses found. Wait for Admin to add one!
                     </div>
-                    <div className="p-6">
-                        <span className="text-xs font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded uppercase tracking-wider">{studentGrade}</span>
-                        <h3 className="text-lg font-bold text-slate-900 mt-3 mb-2">Foundation Mathematics</h3>
-                        <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
-                            <div className="bg-green-500 w-[10%] h-full"></div>
-                        </div>
-                        <p className="text-xs text-slate-500 mt-2">10% Completed</p>
-                        
-                        <button className="w-full mt-6 bg-slate-900 text-white text-sm font-semibold py-3 rounded-lg hover:bg-blue-600 transition">
-                            Continue Learning
-                        </button>
-                    </div>
-                </div>
+                )}
 
-                {/* --- EMPTY STATE CARD (If they want to buy more) --- */}
+                {/* --- EXPLORE MORE CARD --- */}
                 <Link href="/courses" className="border-2 border-dashed border-slate-300 rounded-2xl flex flex-col items-center justify-center text-slate-400 p-6 hover:border-blue-400 hover:text-blue-500 transition min-h-[300px]">
                     <span className="text-4xl mb-4">+</span>
                     <span className="font-medium">Explore More Courses</span>

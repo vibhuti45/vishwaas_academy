@@ -38,9 +38,11 @@ export default function AdminDashboard() {
             <div className="px-4 py-3 bg-blue-600 rounded-lg font-medium cursor-pointer">
                 📊 Dashboard Overview
             </div>
-            <div className="px-4 py-3 text-slate-400 hover:bg-slate-800 rounded-lg font-medium cursor-pointer transition">
-                👥 Manage Students
-            </div>
+            <Link href="/admin/enroll">
+                <button className="bg-green-600 hover:bg-green-500 text-white px-6 py-3 rounded-lg font-semibold transition ml-4">
+                    + Enroll Student
+                </button>
+            </Link>
             <div className="px-4 py-3 text-slate-400 hover:bg-slate-800 rounded-lg font-medium cursor-pointer transition">
                 🎥 Manage Courses
             </div>
@@ -81,9 +83,11 @@ export default function AdminDashboard() {
         <div className="bg-slate-900 rounded-xl border border-slate-800 p-8">
             <h2 className="text-xl font-bold mb-6">Quick Actions</h2>
             <div className="flex gap-4">
-                <button className="bg-blue-600 hover:bg-blue-500 text-white px-6 py-3 rounded-lg font-semibold transition">
-                    + Create New Course
-                </button>
+                <Link href="/admin/create-course">
+                  <button className="bg-blue-600 hover:bg-blue-500 text-white px-6 py-3 rounded-lg font-semibold transition">
+                      + Create New Course
+                  </button>
+                </Link>
                 <button className="bg-slate-800 hover:bg-slate-700 text-white px-6 py-3 rounded-lg font-semibold transition">
                     + Add Faculty
                 </button>
