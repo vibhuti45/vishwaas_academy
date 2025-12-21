@@ -12,7 +12,7 @@ export default function Classroom({ params }: { params: Promise<{ courseId: stri
   
   const [course, setCourse] = useState<any>(null);
   const [chapters, setChapters] = useState<any[]>([]);
-  const [quizzes, setQuizzes] = useState<any[]>([]); // New State
+  const [quizzes, setQuizzes] = useState<any[]>([]); 
   const [activeLesson, setActiveLesson] = useState<any>(null);
   
   // Doubts State
@@ -42,7 +42,7 @@ export default function Classroom({ params }: { params: Promise<{ courseId: stri
             setActiveLesson(fetchedChapters[0].lessons[0]);
         }
 
-        // C. Fetch Quizzes (New)
+        // C. Fetch Quizzes
         const qQuizzes = query(collection(db, "courses", courseId, "quizzes"), where("published", "==", true));
         const quizSnap = await getDocs(qQuizzes);
         const fetchedQuizzes: any[] = [];
@@ -64,7 +64,7 @@ export default function Classroom({ params }: { params: Promise<{ courseId: stri
     fetchData();
   }, [user, courseId]);
 
-  // Handle Doubt Post (Same as before)
+  // Handle Doubt Post
   const handlePostDoubt = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newDoubt.trim()) return;
@@ -97,7 +97,7 @@ export default function Classroom({ params }: { params: Promise<{ courseId: stri
     <div className="flex flex-col h-screen bg-slate-900 text-white overflow-hidden">
       
       {/* HEADER */}
-      <header className="h-16 border-b border-slate-700 flex items-center justify-between px-6 bg-slate-800 flex-shrink-0">
+      <header className="h-16 border-b border-slate-700 flex items-center justify-between px-6 bg-slate-800 flex-shrink-0 z-20">
         <div className="flex items-center gap-4">
             <Link href="/dashboard" className="text-slate-400 hover:text-white transition">&larr; Back</Link>
             <h1 className="font-bold text-lg truncate max-w-md">{course?.title}</h1>
@@ -108,22 +108,43 @@ export default function Classroom({ params }: { params: Promise<{ courseId: stri
       <div className="flex flex-grow overflow-hidden flex-col md:flex-row">
         
         {/* LEFT: Player & Doubts */}
-        <div className="flex-grow flex flex-col overflow-y-auto custom-scrollbar">
-            {/* VIDEO PLAYER */}
-            <div className="bg-black min-h-[400px] flex items-center justify-center p-4">
+        <div className="flex-grow flex flex-col overflow-y-auto custom-scrollbar relative">
+            
+            {/* VIDEO PLAYER SECTION (Mobile Optimized) */}
+            <div className="bg-black min-h-[300px] md:min-h-[400px] flex items-center justify-center p-4 sticky top-0 z-10 md:static">
                 {activeLesson ? (
                     activeLesson.type === 'video' ? (
-                        <div className="w-full max-w-4xl aspect-video bg-black shadow-2xl rounded-lg overflow-hidden border border-slate-800">
-                            <iframe className="w-full h-full" src={`https://www.youtube.com/embed/${getYouTubeId(activeLesson.url)}?rel=0`} allowFullScreen></iframe>
+                        <div className="w-full max-w-4xl aspect-video bg-black shadow-2xl rounded-lg overflow-hidden border border-slate-800 relative">
+                            <iframe 
+                                className="absolute top-0 left-0 w-full h-full"
+                                src={`https://www.youtube.com/embed/${getYouTubeId(activeLesson.url)}?rel=0&playsinline=1&modestbranding=1`}
+                                title={activeLesson.title}
+                                frameBorder="0"
+                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                                allowFullScreen
+                            ></iframe>
                         </div>
                     ) : (
-                        <div className="text-center p-10">
-                            <span className="text-6xl mb-4 block">📄</span>
-                            <h2 className="text-2xl font-bold mb-4">{activeLesson.title}</h2>
-                            <a href={activeLesson.url} target="_blank" className="bg-blue-600 px-6 py-3 rounded-lg font-bold">Open Document ↗</a>
+                        // PDF / DOCUMENT VIEWER (Mobile Friendly)
+                        <div className="text-center p-6 md:p-10 w-full bg-slate-800 rounded-xl border border-slate-700">
+                            <span className="text-4xl md:text-6xl mb-4 block">📄</span>
+                            <h2 className="text-xl md:text-2xl font-bold mb-4 text-white">{activeLesson.title}</h2>
+                            <p className="text-slate-400 mb-6 text-sm">
+                                Documents work best when opened externally on mobile devices.
+                            </p>
+                            
+                            {/* Mobile-Friendly Button */}
+                            <a 
+                                href={activeLesson.url} 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                className="inline-block bg-blue-600 hover:bg-blue-500 text-white px-8 py-4 rounded-lg font-bold text-lg shadow-lg active:scale-95 transition"
+                            >
+                                Open Document ↗
+                            </a>
                         </div>
                     )
-                ) : <p className="text-slate-500">Select a lesson</p>}
+                ) : <p className="text-slate-500">Select a lesson to start</p>}
             </div>
 
             {/* DOUBTS */}
@@ -148,7 +169,7 @@ export default function Classroom({ params }: { params: Promise<{ courseId: stri
         {/* RIGHT: Sidebar */}
         <div className="w-full md:w-80 bg-slate-800 border-l border-slate-700 flex-shrink-0 flex flex-col h-full overflow-y-auto">
             
-            {/* QUIZZES SECTION (New) */}
+            {/* QUIZZES SECTION */}
             {quizzes.length > 0 && (
                 <div className="p-4 border-b border-slate-700">
                     <h3 className="font-bold text-green-400 uppercase text-xs tracking-wider mb-3">⚡ Quizzes & Tests</h3>
