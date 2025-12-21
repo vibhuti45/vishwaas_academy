@@ -115,16 +115,28 @@ export default function CourseEditor({ params }: { params: Promise<{ courseId: s
     <div className="min-h-screen bg-slate-50 p-8">
       
       {/* HEADER */}
-      <div className="max-w-4xl mx-auto mb-8 flex items-center justify-between">
+      {/* ... Inside CourseEditor component return ... */}
+
+        {/* HEADER */}
+        <div className="max-w-4xl mx-auto mb-8 flex items-center justify-between">
         <div>
             <Link href="/faculty/dashboard" className="text-sm text-slate-500 hover:text-blue-600 mb-1 block">&larr; Back to Dashboard</Link>
             <h1 className="text-3xl font-bold text-slate-900">{courseTitle}</h1>
             <p className="text-slate-500">Syllabus & Content Manager</p>
         </div>
-        <button className="bg-white border border-slate-300 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-slate-50">
-            Preview Course
-        </button>
-      </div>
+        
+        {/* NEW BUTTONS */}
+        <div className="flex gap-3">
+            <Link href="/faculty/quizzes">
+                <button className="bg-white border border-purple-200 text-purple-700 px-4 py-2 rounded-lg text-sm font-bold hover:bg-purple-50 flex items-center gap-2">
+                    <span>⚡</span> Manage Quizzes
+                </button>
+            </Link>
+            <button className="bg-white border border-slate-300 px-4 py-2 rounded-lg text-sm font-semibold hover:bg-slate-50">
+                Preview Course
+            </button>
+        </div>
+    </div>
 
       <div className="max-w-4xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-8">
         

@@ -12,7 +12,7 @@ export default function FacultyDashboard() {
   const router = useRouter();
   
   const [facultyData, setFacultyData] = useState({ name: "Faculty", department: "" });
-  const [myCourses, setMyCourses] = useState<any[]>([]); // Store the list of courses
+  const [myCourses, setMyCourses] = useState<any[]>([]);
   const [dataLoading, setDataLoading] = useState(true);
 
   // 1. Protect Route
@@ -27,7 +27,6 @@ export default function FacultyDashboard() {
     const initData = async () => {
       if (user?.uid) {
         try {
-          // A. Fetch Profile
           const docSnap = await getDoc(doc(db, "users", user.uid));
           if (docSnap.exists()) {
             setFacultyData({
@@ -36,11 +35,7 @@ export default function FacultyDashboard() {
             });
           }
 
-          // B. Fetch Assigned Courses (The Magic Query)
-          const q = query(
-            collection(db, "courses"), 
-            where("assignedFacultyId", "==", user.uid) // <--- Only MY courses
-          );
+          const q = query(collection(db, "courses"), where("assignedFacultyId", "==", user.uid));
           const querySnapshot = await getDocs(q);
           
           const courses: any[] = [];
@@ -56,7 +51,6 @@ export default function FacultyDashboard() {
         }
       }
     };
-
     initData();
   }, [user]);
 
@@ -66,7 +60,7 @@ export default function FacultyDashboard() {
     <div className="min-h-screen bg-slate-50 flex">
       
       {/* Sidebar */}
-      <aside className="w-64 bg-white border-r border-slate-200 hidden md:flex flex-col fixed h-full">
+      <aside className="w-64 bg-white border-r border-slate-200 hidden md:flex flex-col fixed h-full z-10">
         <div className="p-6 flex items-center gap-3 border-b border-slate-100">
            <Image src="/logo.svg" alt="Logo" width={32} height={32} />
            <span className="font-bold text-slate-900">Faculty Panel</span>
@@ -79,41 +73,43 @@ export default function FacultyDashboard() {
         </div>
 
         <nav className="flex-grow p-4 space-y-2">
-            {/* 1. My Classes Link */}
             <Link href="/faculty/dashboard">
                 <div className="px-4 py-3 bg-blue-50 text-blue-700 rounded-lg font-medium cursor-pointer flex items-center gap-3">
                     <span>📚</span> My Classes
                 </div>
             </Link>
-
-            {/* 2. Student Doubts Link (NOW WORKING) */}
             <Link href="/faculty/doubts">
                 <div className="px-4 py-3 text-slate-600 hover:bg-slate-50 rounded-lg font-medium cursor-pointer transition flex items-center gap-3">
                     <span>🙋‍♂️</span> Student Doubts
                 </div>
             </Link>
-            <button onClick={logout} className="text-red-600 font-medium hover:bg-red-50 w-full text-left px-4 py-3 rounded-lg mt-auto">Logout</button>
+            <Link href="/faculty/quizzes">
+                <div className="px-4 py-3 text-slate-600 hover:bg-slate-50 rounded-lg font-medium cursor-pointer transition flex items-center gap-3">
+                    <span>⚡</span> Quiz Manager
+                </div>
+            </Link>
+            <button onClick={logout} className="text-red-600 font-medium hover:bg-red-50 w-full text-left px-4 py-3 rounded-lg mt-auto flex items-center gap-3">
+                <span>🚪</span> Logout
+            </button>
         </nav>
       </aside>
 
       {/* Main Content */}
       <main className="flex-grow md:ml-64 p-10">
         <h1 className="text-3xl font-bold text-slate-900 mb-2">My Assigned Courses</h1>
-        <p className="text-slate-500 mb-8">Select a course to upload videos, notes, or manage students.</p>
+        <p className="text-slate-500 mb-8">Manage your syllabus, videos, and quizzes.</p>
 
         {myCourses.length === 0 ? (
-          // EMPTY STATE
           <div className="bg-white p-12 rounded-xl shadow-sm border border-slate-200 text-center">
             <span className="text-4xl">📭</span>
             <h3 className="text-xl font-bold text-slate-900 mt-4">No Classes Yet</h3>
             <p className="text-slate-500 mt-2">Contact the Admin to assign a subject to you.</p>
           </div>
         ) : (
-          // COURSE GRID
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
             {myCourses.map((course) => (
-              <div key={course.id} className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition group">
-                {/* Thumbnail Header */}
+              <div key={course.id} className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition group flex flex-col">
+                {/* Thumbnail */}
                 <div className="h-32 bg-slate-100 relative">
                    {course.thumbnail && (
                      <Image src={course.thumbnail} alt={course.title} fill className="object-cover" />
@@ -123,16 +119,24 @@ export default function FacultyDashboard() {
                    </div>
                 </div>
 
-                <div className="p-5">
+                <div className="p-5 flex flex-col flex-grow">
                   <h3 className="font-bold text-lg text-slate-900 mb-1">{course.title}</h3>
                   <p className="text-sm text-slate-500 mb-4 truncate">{course.description}</p>
                   
-                  {/* The 'Manage' Button */}
-                  <Link href={`/faculty/courses/${course.id}`}>
-                    <button className="w-full bg-blue-600 text-white text-sm font-semibold py-2.5 rounded-lg hover:bg-blue-700 transition flex items-center justify-center gap-2">
-                      <span>⚙️</span> Manage Content
-                    </button>
-                  </Link>
+                  {/* BUTTONS ROW */}
+                  <div className="mt-auto grid grid-cols-2 gap-2">
+                      <Link href={`/faculty/courses/${course.id}`} className="w-full">
+                        <button className="w-full bg-slate-100 text-slate-700 text-sm font-semibold py-2.5 rounded-lg hover:bg-slate-200 transition flex items-center justify-center gap-2">
+                          <span>🎥</span> Content
+                        </button>
+                      </Link>
+                      
+                      <Link href="/faculty/quizzes" className="w-full">
+                        <button className="w-full bg-blue-50 text-blue-700 text-sm font-semibold py-2.5 rounded-lg hover:bg-blue-100 transition flex items-center justify-center gap-2">
+                          <span>⚡</span> Quiz
+                        </button>
+                      </Link>
+                  </div>
                 </div>
               </div>
             ))}

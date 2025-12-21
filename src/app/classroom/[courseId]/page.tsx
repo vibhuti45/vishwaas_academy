@@ -9,18 +9,18 @@ import Link from "next/link";
 export default function Classroom({ params }: { params: Promise<{ courseId: string }> }) {
   const { courseId } = use(params);
   const { user, loading } = useAuth();
-  const router = useRouter();
-
+  
   const [course, setCourse] = useState<any>(null);
   const [chapters, setChapters] = useState<any[]>([]);
+  const [quizzes, setQuizzes] = useState<any[]>([]); // New State
   const [activeLesson, setActiveLesson] = useState<any>(null);
   
-  // --- DOUBT SYSTEM STATES ---
+  // Doubts State
   const [doubts, setDoubts] = useState<any[]>([]);
   const [newDoubt, setNewDoubt] = useState("");
   const [doubtLoading, setDoubtLoading] = useState(false);
 
-  // 1. Fetch Course Content & Doubts
+  // 1. Fetch Everything
   useEffect(() => {
     if (!user) return;
 
@@ -37,12 +37,19 @@ export default function Classroom({ params }: { params: Promise<{ courseId: stri
         chapterSnap.forEach((doc) => fetchedChapters.push({ id: doc.id, ...doc.data() }));
         setChapters(fetchedChapters);
 
+        // Auto-play first lesson
         if (fetchedChapters.length > 0 && fetchedChapters[0].lessons?.length > 0) {
             setActiveLesson(fetchedChapters[0].lessons[0]);
         }
 
-        // C. Fetch Doubts (Questions)
-        // We order by time so newest is top
+        // C. Fetch Quizzes (New)
+        const qQuizzes = query(collection(db, "courses", courseId, "quizzes"), where("published", "==", true));
+        const quizSnap = await getDocs(qQuizzes);
+        const fetchedQuizzes: any[] = [];
+        quizSnap.forEach((doc) => fetchedQuizzes.push({ id: doc.id, ...doc.data() }));
+        setQuizzes(fetchedQuizzes);
+
+        // D. Fetch Doubts
         const qDoubts = query(collection(db, "courses", courseId, "doubts"), orderBy("createdAt", "desc"));
         const doubtSnap = await getDocs(qDoubts);
         const fetchedDoubts: any[] = [];
@@ -57,34 +64,25 @@ export default function Classroom({ params }: { params: Promise<{ courseId: stri
     fetchData();
   }, [user, courseId]);
 
-  // 2. Handle Sending a Doubt
+  // Handle Doubt Post (Same as before)
   const handlePostDoubt = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newDoubt.trim()) return;
     setDoubtLoading(true);
-
     try {
         const doubtData = {
             studentName: (user as any)?.displayName || "Student",
             studentId: user?.uid,
             question: newDoubt,
-            lessonTitle: activeLesson?.title || "General", // Tag it with the current video
+            lessonTitle: activeLesson?.title || "General",
             createdAt: serverTimestamp(),
-            status: "open", // Teacher hasn't replied yet
+            status: "open",
             reply: null
         };
-
         const docRef = await addDoc(collection(db, "courses", courseId, "doubts"), doubtData);
-        
-        // Update UI instantly
         setDoubts([{ id: docRef.id, ...doubtData, createdAt: new Date() }, ...doubts]);
         setNewDoubt("");
-    } catch (error) {
-        console.error("Error posting doubt:", error);
-        alert("Failed to post question.");
-    } finally {
-        setDoubtLoading(false);
-    }
+    } catch (error) { console.error(error); } finally { setDoubtLoading(false); }
   };
 
   const getYouTubeId = (url: string) => {
@@ -109,20 +107,14 @@ export default function Classroom({ params }: { params: Promise<{ courseId: stri
 
       <div className="flex flex-grow overflow-hidden flex-col md:flex-row">
         
-        {/* LEFT: Player & Doubts (Scrollable) */}
+        {/* LEFT: Player & Doubts */}
         <div className="flex-grow flex flex-col overflow-y-auto custom-scrollbar">
-            
-            {/* VIDEO PLAYER SECTION */}
+            {/* VIDEO PLAYER */}
             <div className="bg-black min-h-[400px] flex items-center justify-center p-4">
                 {activeLesson ? (
                     activeLesson.type === 'video' ? (
                         <div className="w-full max-w-4xl aspect-video bg-black shadow-2xl rounded-lg overflow-hidden border border-slate-800">
-                            <iframe 
-                                className="w-full h-full"
-                                src={`https://www.youtube.com/embed/${getYouTubeId(activeLesson.url)}?rel=0`}
-                                title={activeLesson.title}
-                                allowFullScreen
-                            ></iframe>
+                            <iframe className="w-full h-full" src={`https://www.youtube.com/embed/${getYouTubeId(activeLesson.url)}?rel=0`} allowFullScreen></iframe>
                         </div>
                     ) : (
                         <div className="text-center p-10">
@@ -134,61 +126,50 @@ export default function Classroom({ params }: { params: Promise<{ courseId: stri
                 ) : <p className="text-slate-500">Select a lesson</p>}
             </div>
 
-            {/* DOUBTS SECTION */}
+            {/* DOUBTS */}
             <div className="max-w-4xl w-full mx-auto p-6">
                 <h3 className="text-xl font-bold mb-4">Discussion & Doubts</h3>
-                
-                {/* Ask Form */}
                 <form onSubmit={handlePostDoubt} className="flex gap-4 mb-8">
-                    <input 
-                        type="text" 
-                        value={newDoubt}
-                        onChange={(e) => setNewDoubt(e.target.value)}
-                        placeholder={`Ask a question about "${activeLesson?.title || 'this course'}"...`}
-                        className="flex-grow bg-slate-800 border border-slate-700 rounded-lg px-4 py-3 text-white focus:ring-2 focus:ring-blue-500 outline-none"
-                    />
-                    <button disabled={doubtLoading} className="bg-blue-600 hover:bg-blue-500 text-white font-bold px-6 py-3 rounded-lg disabled:opacity-50">
-                        {doubtLoading ? "..." : "Post"}
-                    </button>
+                    <input type="text" value={newDoubt} onChange={(e) => setNewDoubt(e.target.value)} placeholder="Ask a question..." className="flex-grow bg-slate-800 border border-slate-700 rounded-lg px-4 py-3 text-white outline-none" />
+                    <button disabled={doubtLoading} className="bg-blue-600 text-white font-bold px-6 py-3 rounded-lg">{doubtLoading ? "..." : "Post"}</button>
                 </form>
-
-                {/* Doubts List */}
                 <div className="space-y-4 pb-10">
-                    {doubts.length === 0 ? (
-                        <p className="text-slate-500 text-center italic">No questions yet. Be the first to ask!</p>
-                    ) : (
-                        doubts.map((doubt) => (
-                            <div key={doubt.id} className="bg-slate-800 p-4 rounded-xl border border-slate-700">
-                                <div className="flex justify-between items-start mb-2">
-                                    <div>
-                                        <span className="font-bold text-blue-400 text-sm">{doubt.studentName}</span>
-                                        <span className="text-slate-500 text-xs ml-2">• on {doubt.lessonTitle}</span>
-                                    </div>
-                                    {doubt.status === "resolved" ? (
-                                        <span className="text-xs bg-green-900 text-green-300 px-2 py-1 rounded">Resolved</span>
-                                    ) : (
-                                        <span className="text-xs bg-yellow-900 text-yellow-300 px-2 py-1 rounded">Open</span>
-                                    )}
-                                </div>
-                                <p className="text-slate-200 mb-3">{doubt.question}</p>
-                                
-                                {/* Teacher Reply */}
-                                {doubt.reply && (
-                                    <div className="bg-slate-700/50 p-3 rounded-lg border-l-4 border-green-500 ml-4">
-                                        <p className="text-xs text-green-400 font-bold mb-1">Teacher's Answer:</p>
-                                        <p className="text-sm text-slate-300">{doubt.reply}</p>
-                                    </div>
-                                )}
-                            </div>
-                        ))
-                    )}
+                    {doubts.map((doubt) => (
+                        <div key={doubt.id} className="bg-slate-800 p-4 rounded-xl border border-slate-700">
+                            <div className="flex justify-between mb-2"><span className="font-bold text-blue-400 text-sm">{doubt.studentName}</span></div>
+                            <p className="text-slate-200 mb-2">{doubt.question}</p>
+                            {doubt.reply && <div className="bg-slate-700/50 p-3 rounded-lg border-l-4 border-green-500 ml-4"><p className="text-xs text-green-400 font-bold mb-1">Teacher's Answer:</p><p className="text-sm text-slate-300">{doubt.reply}</p></div>}
+                        </div>
+                    ))}
                 </div>
             </div>
         </div>
 
-        {/* RIGHT: Playlist (Sidebar) */}
+        {/* RIGHT: Sidebar */}
         <div className="w-full md:w-80 bg-slate-800 border-l border-slate-700 flex-shrink-0 flex flex-col h-full overflow-y-auto">
-            <div className="p-4 border-b border-slate-700 bg-slate-800 sticky top-0">
+            
+            {/* QUIZZES SECTION (New) */}
+            {quizzes.length > 0 && (
+                <div className="p-4 border-b border-slate-700">
+                    <h3 className="font-bold text-green-400 uppercase text-xs tracking-wider mb-3">⚡ Quizzes & Tests</h3>
+                    <div className="space-y-2">
+                        {quizzes.map(quiz => (
+                            <Link key={quiz.id} href={`/classroom/${courseId}/quiz/${quiz.id}`}>
+                                <div className="w-full flex items-center justify-between p-3 rounded-lg bg-green-900/20 border border-green-900/50 hover:bg-green-900/40 transition cursor-pointer">
+                                    <div className="flex items-center gap-2 overflow-hidden">
+                                        <span className="text-lg">📝</span>
+                                        <span className="truncate text-sm font-medium text-green-100">{quiz.title}</span>
+                                    </div>
+                                    <span className="text-xs text-green-400">{quiz.duration}m</span>
+                                </div>
+                            </Link>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {/* CHAPTERS SECTION */}
+            <div className="p-4 bg-slate-800 sticky top-0">
                 <h3 className="font-bold text-slate-300 uppercase text-xs tracking-wider">Course Content</h3>
             </div>
             <div className="p-2 space-y-4">
@@ -197,13 +178,7 @@ export default function Classroom({ params }: { params: Promise<{ courseId: stri
                         <h4 className="font-bold text-white text-xs mb-2 px-2 mt-2 bg-slate-700/50 py-1 rounded">{chapter.title}</h4>
                         <div className="space-y-1">
                             {chapter.lessons?.map((lesson: any, index: number) => (
-                                <button 
-                                    key={index}
-                                    onClick={() => setActiveLesson(lesson)}
-                                    className={`w-full flex items-center gap-3 p-2 rounded text-left transition text-sm ${
-                                        activeLesson === lesson ? "bg-blue-600 text-white" : "hover:bg-slate-700 text-slate-300"
-                                    }`}
-                                >
+                                <button key={index} onClick={() => setActiveLesson(lesson)} className={`w-full flex items-center gap-3 p-2 rounded text-left transition text-sm ${activeLesson === lesson ? "bg-blue-600 text-white" : "hover:bg-slate-700 text-slate-300"}`}>
                                     <span className="text-xs">{lesson.type === 'video' ? '▶' : '📄'}</span>
                                     <span className="truncate">{lesson.title}</span>
                                 </button>
