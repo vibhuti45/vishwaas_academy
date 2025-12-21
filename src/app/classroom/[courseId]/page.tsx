@@ -15,56 +15,45 @@ export default function Classroom({ params }: { params: Promise<{ courseId: stri
   const [quizzes, setQuizzes] = useState<any[]>([]); 
   const [activeLesson, setActiveLesson] = useState<any>(null);
   
-  // Doubts State
   const [doubts, setDoubts] = useState<any[]>([]);
   const [newDoubt, setNewDoubt] = useState("");
   const [doubtLoading, setDoubtLoading] = useState(false);
 
-  // 1. Fetch Everything
+  // 1. Fetch Data
   useEffect(() => {
     if (!user) return;
-
     const fetchData = async () => {
       try {
-        // A. Course Details
         const courseSnap = await getDoc(doc(db, "courses", courseId));
         if (courseSnap.exists()) setCourse(courseSnap.data());
 
-        // B. Chapters
         const qChapters = query(collection(db, "courses", courseId, "chapters"), orderBy("createdAt", "asc"));
         const chapterSnap = await getDocs(qChapters);
         const fetchedChapters: any[] = [];
         chapterSnap.forEach((doc) => fetchedChapters.push({ id: doc.id, ...doc.data() }));
         setChapters(fetchedChapters);
 
-        // Auto-play first lesson
         if (fetchedChapters.length > 0 && fetchedChapters[0].lessons?.length > 0) {
             setActiveLesson(fetchedChapters[0].lessons[0]);
         }
 
-        // C. Fetch Quizzes
         const qQuizzes = query(collection(db, "courses", courseId, "quizzes"), where("published", "==", true));
         const quizSnap = await getDocs(qQuizzes);
         const fetchedQuizzes: any[] = [];
         quizSnap.forEach((doc) => fetchedQuizzes.push({ id: doc.id, ...doc.data() }));
         setQuizzes(fetchedQuizzes);
 
-        // D. Fetch Doubts
         const qDoubts = query(collection(db, "courses", courseId, "doubts"), orderBy("createdAt", "desc"));
         const doubtSnap = await getDocs(qDoubts);
         const fetchedDoubts: any[] = [];
         doubtSnap.forEach((doc) => fetchedDoubts.push({ id: doc.id, ...doc.data() }));
         setDoubts(fetchedDoubts);
 
-      } catch (error) {
-        console.error("Error loading classroom:", error);
-      }
+      } catch (error) { console.error(error); }
     };
-
     fetchData();
   }, [user, courseId]);
 
-  // Handle Doubt Post
   const handlePostDoubt = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newDoubt.trim()) return;
@@ -91,10 +80,31 @@ export default function Classroom({ params }: { params: Promise<{ courseId: stri
     return (match && match[2].length === 11) ? match[2] : null;
   };
 
+  // Reusable Component for Doubts (to render in different places based on screen size)
+  const DoubtsSection = () => (
+    <div className="max-w-4xl w-full mx-auto p-6">
+        <h3 className="text-xl font-bold mb-4">Discussion & Doubts</h3>
+        <form onSubmit={handlePostDoubt} className="flex gap-4 mb-8">
+            <input type="text" value={newDoubt} onChange={(e) => setNewDoubt(e.target.value)} placeholder="Ask a question..." className="flex-grow bg-slate-800 border border-slate-700 rounded-lg px-4 py-3 text-white outline-none" />
+            <button disabled={doubtLoading} className="bg-blue-600 text-white font-bold px-6 py-3 rounded-lg">{doubtLoading ? "..." : "Post"}</button>
+        </form>
+        <div className="space-y-4 pb-10">
+            {doubts.map((doubt) => (
+                <div key={doubt.id} className="bg-slate-800 p-4 rounded-xl border border-slate-700">
+                    <div className="flex justify-between mb-2"><span className="font-bold text-blue-400 text-sm">{doubt.studentName}</span></div>
+                    <p className="text-slate-200 mb-2">{doubt.question}</p>
+                    {doubt.reply && <div className="bg-slate-700/50 p-3 rounded-lg border-l-4 border-green-500 ml-4"><p className="text-xs text-green-400 font-bold mb-1">Teacher's Answer:</p><p className="text-sm text-slate-300">{doubt.reply}</p></div>}
+                </div>
+            ))}
+        </div>
+    </div>
+  );
+
   if (loading) return <div className="p-10 text-center text-white">Loading...</div>;
 
   return (
-    <div className="flex flex-col h-screen bg-slate-900 text-white overflow-hidden">
+    // FIX: Removed 'h-screen' and 'overflow-hidden' for mobile. Only applied on md (desktop)
+    <div className="flex flex-col min-h-screen md:h-screen bg-slate-900 text-white md:overflow-hidden">
       
       {/* HEADER */}
       <header className="h-16 border-b border-slate-700 flex items-center justify-between px-6 bg-slate-800 flex-shrink-0 z-20">
@@ -105,78 +115,54 @@ export default function Classroom({ params }: { params: Promise<{ courseId: stri
         <div className="text-sm text-slate-400">{(user as any)?.displayName || "Student"}</div>
       </header>
 
-      <div className="flex flex-grow overflow-hidden flex-col md:flex-row">
+      {/* MAIN CONTAINER */}
+      <div className="flex flex-col md:flex-row flex-grow md:overflow-hidden">
         
-        {/* LEFT: Player & Doubts */}
-        <div className="flex-grow flex flex-col overflow-y-auto custom-scrollbar relative">
+        {/* LEFT COLUMN: Video Player + (Desktop Only) Doubts */}
+        <div className="w-full md:flex-1 flex flex-col md:overflow-y-auto custom-scrollbar">
             
-            {/* VIDEO PLAYER SECTION (Mobile Optimized) */}
-            <div className="bg-black min-h-[300px] md:min-h-[400px] flex items-center justify-center p-4 sticky top-0 z-10 md:static">
+            {/* VIDEO PLAYER (Sticky on Mobile) */}
+            <div className="bg-black min-h-[250px] md:min-h-[400px] flex items-center justify-center p-0 md:p-4 sticky top-0 z-30 md:static">
                 {activeLesson ? (
                     activeLesson.type === 'video' ? (
-                        <div className="w-full max-w-4xl aspect-video bg-black shadow-2xl rounded-lg overflow-hidden border border-slate-800 relative">
+                        <div className="w-full h-full md:max-w-4xl md:aspect-video bg-black shadow-2xl md:rounded-lg overflow-hidden border-b md:border border-slate-800 relative aspect-video">
                             <iframe 
                                 className="absolute top-0 left-0 w-full h-full"
                                 src={`https://www.youtube.com/embed/${getYouTubeId(activeLesson.url)}?rel=0&playsinline=1&modestbranding=1`}
                                 title={activeLesson.title}
-                                frameBorder="0"
-                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                                 allowFullScreen
                             ></iframe>
                         </div>
                     ) : (
-                        // PDF / DOCUMENT VIEWER (Mobile Friendly)
-                        <div className="text-center p-6 md:p-10 w-full bg-slate-800 rounded-xl border border-slate-700">
-                            <span className="text-4xl md:text-6xl mb-4 block">📄</span>
-                            <h2 className="text-xl md:text-2xl font-bold mb-4 text-white">{activeLesson.title}</h2>
-                            <p className="text-slate-400 mb-6 text-sm">
-                                Documents work best when opened externally on mobile devices.
-                            </p>
-                            
-                            {/* Mobile-Friendly Button */}
-                            <a 
-                                href={activeLesson.url} 
-                                target="_blank" 
-                                rel="noopener noreferrer"
-                                className="inline-block bg-blue-600 hover:bg-blue-500 text-white px-8 py-4 rounded-lg font-bold text-lg shadow-lg active:scale-95 transition"
-                            >
+                        <div className="text-center p-8 w-full bg-slate-800 md:rounded-xl border-b md:border border-slate-700">
+                            <span className="text-5xl mb-4 block">📄</span>
+                            <h2 className="text-xl font-bold mb-4 text-white">{activeLesson.title}</h2>
+                            <a href={activeLesson.url} target="_blank" rel="noopener noreferrer" className="inline-block bg-blue-600 text-white px-6 py-3 rounded-lg font-bold">
                                 Open Document ↗
                             </a>
                         </div>
                     )
-                ) : <p className="text-slate-500">Select a lesson to start</p>}
+                ) : <p className="text-slate-500 p-10">Select a lesson to start</p>}
             </div>
 
-            {/* DOUBTS */}
-            <div className="max-w-4xl w-full mx-auto p-6">
-                <h3 className="text-xl font-bold mb-4">Discussion & Doubts</h3>
-                <form onSubmit={handlePostDoubt} className="flex gap-4 mb-8">
-                    <input type="text" value={newDoubt} onChange={(e) => setNewDoubt(e.target.value)} placeholder="Ask a question..." className="flex-grow bg-slate-800 border border-slate-700 rounded-lg px-4 py-3 text-white outline-none" />
-                    <button disabled={doubtLoading} className="bg-blue-600 text-white font-bold px-6 py-3 rounded-lg">{doubtLoading ? "..." : "Post"}</button>
-                </form>
-                <div className="space-y-4 pb-10">
-                    {doubts.map((doubt) => (
-                        <div key={doubt.id} className="bg-slate-800 p-4 rounded-xl border border-slate-700">
-                            <div className="flex justify-between mb-2"><span className="font-bold text-blue-400 text-sm">{doubt.studentName}</span></div>
-                            <p className="text-slate-200 mb-2">{doubt.question}</p>
-                            {doubt.reply && <div className="bg-slate-700/50 p-3 rounded-lg border-l-4 border-green-500 ml-4"><p className="text-xs text-green-400 font-bold mb-1">Teacher's Answer:</p><p className="text-sm text-slate-300">{doubt.reply}</p></div>}
-                        </div>
-                    ))}
-                </div>
+            {/* DOUBTS (VISIBLE ONLY ON DESKTOP) */}
+            <div className="hidden md:block">
+                <DoubtsSection />
             </div>
         </div>
 
-        {/* RIGHT: Sidebar */}
-        <div className="w-full md:w-80 bg-slate-800 border-l border-slate-700 flex-shrink-0 flex flex-col h-full overflow-y-auto">
+        {/* RIGHT COLUMN: Sidebar (Lessons) + (Mobile Only) Doubts */}
+        <div className="w-full md:w-80 bg-slate-800 border-l border-slate-700 flex-shrink-0 flex flex-col md:h-full md:overflow-y-auto">
             
-            {/* QUIZZES SECTION */}
+            {/* QUIZZES */}
             {quizzes.length > 0 && (
                 <div className="p-4 border-b border-slate-700">
-                    <h3 className="font-bold text-green-400 uppercase text-xs tracking-wider mb-3">⚡ Quizzes & Tests</h3>
+                    <h3 className="font-bold text-green-400 uppercase text-xs tracking-wider mb-3">⚡ Quizzes</h3>
                     <div className="space-y-2">
                         {quizzes.map(quiz => (
                             <Link key={quiz.id} href={`/classroom/${courseId}/quiz/${quiz.id}`}>
-                                <div className="w-full flex items-center justify-between p-3 rounded-lg bg-green-900/20 border border-green-900/50 hover:bg-green-900/40 transition cursor-pointer">
+                                <div className="w-full flex items-center justify-between p-3 rounded-lg bg-green-900/20 border border-green-900/50 hover:bg-green-900/40 transition">
                                     <div className="flex items-center gap-2 overflow-hidden">
                                         <span className="text-lg">📝</span>
                                         <span className="truncate text-sm font-medium text-green-100">{quiz.title}</span>
@@ -189,17 +175,17 @@ export default function Classroom({ params }: { params: Promise<{ courseId: stri
                 </div>
             )}
 
-            {/* CHAPTERS SECTION */}
-            <div className="p-4 bg-slate-800 sticky top-0">
+            {/* CHAPTERS / LESSON LIST */}
+            <div className="p-4 bg-slate-800 sticky top-0 border-b border-slate-700">
                 <h3 className="font-bold text-slate-300 uppercase text-xs tracking-wider">Course Content</h3>
             </div>
-            <div className="p-2 space-y-4">
+            <div className="p-2 space-y-4 pb-8">
                 {chapters.map((chapter) => (
                     <div key={chapter.id}>
                         <h4 className="font-bold text-white text-xs mb-2 px-2 mt-2 bg-slate-700/50 py-1 rounded">{chapter.title}</h4>
                         <div className="space-y-1">
                             {chapter.lessons?.map((lesson: any, index: number) => (
-                                <button key={index} onClick={() => setActiveLesson(lesson)} className={`w-full flex items-center gap-3 p-2 rounded text-left transition text-sm ${activeLesson === lesson ? "bg-blue-600 text-white" : "hover:bg-slate-700 text-slate-300"}`}>
+                                <button key={index} onClick={() => setActiveLesson(lesson)} className={`w-full flex items-center gap-3 p-3 rounded text-left transition text-sm ${activeLesson === lesson ? "bg-blue-600 text-white" : "bg-slate-800/50 hover:bg-slate-700 text-slate-300"}`}>
                                     <span className="text-xs">{lesson.type === 'video' ? '▶' : '📄'}</span>
                                     <span className="truncate">{lesson.title}</span>
                                 </button>
@@ -207,6 +193,11 @@ export default function Classroom({ params }: { params: Promise<{ courseId: stri
                         </div>
                     </div>
                 ))}
+            </div>
+
+            {/* DOUBTS (VISIBLE ONLY ON MOBILE - Below Lessons) */}
+            <div className="block md:hidden border-t border-slate-700 mt-4">
+                <DoubtsSection />
             </div>
         </div>
 
