@@ -13,6 +13,7 @@ export default function Classroom({ params }: { params: Promise<{ courseId: stri
   const [course, setCourse] = useState<any>(null);
   const [chapters, setChapters] = useState<any[]>([]);
   const [quizzes, setQuizzes] = useState<any[]>([]); 
+  const [userResults, setUserResults] = useState<{[key: string]: any}>({}); // Stores scores: { quizId: resultData }
   const [activeLesson, setActiveLesson] = useState<any>(null);
   
   const [doubts, setDoubts] = useState<any[]>([]);
@@ -24,25 +25,41 @@ export default function Classroom({ params }: { params: Promise<{ courseId: stri
     if (!user) return;
     const fetchData = async () => {
       try {
+        // A. Course Info
         const courseSnap = await getDoc(doc(db, "courses", courseId));
         if (courseSnap.exists()) setCourse(courseSnap.data());
 
+        // B. Chapters & Lessons
         const qChapters = query(collection(db, "courses", courseId, "chapters"), orderBy("createdAt", "asc"));
         const chapterSnap = await getDocs(qChapters);
         const fetchedChapters: any[] = [];
         chapterSnap.forEach((doc) => fetchedChapters.push({ id: doc.id, ...doc.data() }));
         setChapters(fetchedChapters);
 
+        // Set default active lesson
         if (fetchedChapters.length > 0 && fetchedChapters[0].lessons?.length > 0) {
             setActiveLesson(fetchedChapters[0].lessons[0]);
         }
 
+        // C. Quizzes (Published Only)
         const qQuizzes = query(collection(db, "courses", courseId, "quizzes"), where("published", "==", true));
         const quizSnap = await getDocs(qQuizzes);
         const fetchedQuizzes: any[] = [];
         quizSnap.forEach((doc) => fetchedQuizzes.push({ id: doc.id, ...doc.data() }));
         setQuizzes(fetchedQuizzes);
 
+        // D. User Quiz Results (To show scores)
+        const resultsRef = collection(db, "users", user.uid, "results");
+        const qResults = query(resultsRef, where("courseId", "==", courseId));
+        const resSnaps = await getDocs(qResults);
+        const resultMap: {[key: string]: any} = {};
+        resSnaps.forEach(doc => {
+            const data = doc.data();
+            resultMap[data.quizId] = data; // Map score to quizId
+        });
+        setUserResults(resultMap);
+
+        // E. Doubts
         const qDoubts = query(collection(db, "courses", courseId, "doubts"), orderBy("createdAt", "desc"));
         const doubtSnap = await getDocs(qDoubts);
         const fetchedDoubts: any[] = [];
@@ -80,7 +97,7 @@ export default function Classroom({ params }: { params: Promise<{ courseId: stri
     return (match && match[2].length === 11) ? match[2] : null;
   };
 
-  // Reusable Component for Doubts (to render in different places based on screen size)
+  // Reusable Component for Doubts
   const DoubtsSection = () => (
     <div className="max-w-4xl w-full mx-auto p-6">
         <h3 className="text-xl font-bold mb-4">Discussion & Doubts</h3>
@@ -103,7 +120,6 @@ export default function Classroom({ params }: { params: Promise<{ courseId: stri
   if (loading) return <div className="p-10 text-center text-white">Loading...</div>;
 
   return (
-    // FIX: Removed 'h-screen' and 'overflow-hidden' for mobile. Only applied on md (desktop)
     <div className="flex flex-col min-h-screen md:h-screen bg-slate-900 text-white md:overflow-hidden">
       
       {/* HEADER */}
@@ -121,7 +137,7 @@ export default function Classroom({ params }: { params: Promise<{ courseId: stri
         {/* LEFT COLUMN: Video Player + (Desktop Only) Doubts */}
         <div className="w-full md:flex-1 flex flex-col md:overflow-y-auto custom-scrollbar">
             
-            {/* VIDEO PLAYER (Sticky on Mobile) */}
+            {/* VIDEO PLAYER */}
             <div className="bg-black min-h-[250px] md:min-h-[400px] flex items-center justify-center p-0 md:p-4 sticky top-0 z-30 md:static">
                 {activeLesson ? (
                     activeLesson.type === 'video' ? (
@@ -155,22 +171,39 @@ export default function Classroom({ params }: { params: Promise<{ courseId: stri
         {/* RIGHT COLUMN: Sidebar (Lessons) + (Mobile Only) Doubts */}
         <div className="w-full md:w-80 bg-slate-800 border-l border-slate-700 flex-shrink-0 flex flex-col md:h-full md:overflow-y-auto">
             
-            {/* QUIZZES */}
+            {/* QUIZZES SECTION (UPDATED) */}
             {quizzes.length > 0 && (
                 <div className="p-4 border-b border-slate-700">
                     <h3 className="font-bold text-green-400 uppercase text-xs tracking-wider mb-3">⚡ Quizzes</h3>
                     <div className="space-y-2">
-                        {quizzes.map(quiz => (
-                            <Link key={quiz.id} href={`/classroom/${courseId}/quiz/${quiz.id}`}>
-                                <div className="w-full flex items-center justify-between p-3 rounded-lg bg-green-900/20 border border-green-900/50 hover:bg-green-900/40 transition">
-                                    <div className="flex items-center gap-2 overflow-hidden">
-                                        <span className="text-lg">📝</span>
-                                        <span className="truncate text-sm font-medium text-green-100">{quiz.title}</span>
+                        {quizzes.map(quiz => {
+                            const attempt = userResults[quiz.id];
+                            return (
+                                <Link key={quiz.id} href={`/classroom/${courseId}/quiz/${quiz.id}`}>
+                                    <div className={`w-full flex items-center justify-between p-3 rounded-lg border transition ${attempt ? 'bg-slate-700 border-slate-600' : 'bg-green-900/20 border-green-900/50 hover:bg-green-900/40'}`}>
+                                        <div className="flex items-center gap-2 overflow-hidden">
+                                            <span className="text-lg">📝</span>
+                                            <div className="flex flex-col">
+                                                <span className={`truncate text-sm font-medium ${attempt ? 'text-slate-300' : 'text-green-100'}`}>{quiz.title}</span>
+                                                {attempt ? (
+                                                    <span className={`text-[10px] font-bold ${Number(attempt.score) >= 40 ? 'text-green-400' : 'text-red-400'}`}>
+                                                        Score: {Number(attempt.score).toFixed(0)}%
+                                                    </span>
+                                                ) : (
+                                                    <span className="text-[10px] text-green-400/70">Not Attempted</span>
+                                                )}
+                                            </div>
+                                        </div>
+                                        
+                                        {attempt ? (
+                                            <span className="text-xs bg-slate-600 px-2 py-1 rounded text-white">View</span>
+                                        ) : (
+                                            <span className="text-xs text-green-400">{quiz.duration}m</span>
+                                        )}
                                     </div>
-                                    <span className="text-xs text-green-400">{quiz.duration}m</span>
-                                </div>
-                            </Link>
-                        ))}
+                                </Link>
+                            );
+                        })}
                     </div>
                 </div>
             )}
@@ -195,7 +228,7 @@ export default function Classroom({ params }: { params: Promise<{ courseId: stri
                 ))}
             </div>
 
-            {/* DOUBTS (VISIBLE ONLY ON MOBILE - Below Lessons) */}
+            {/* DOUBTS (VISIBLE ONLY ON MOBILE) */}
             <div className="block md:hidden border-t border-slate-700 mt-4">
                 <DoubtsSection />
             </div>
