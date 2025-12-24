@@ -3,12 +3,11 @@ import { useState } from "react";
 import { db } from "@/lib/firebase";
 import { doc, setDoc } from "firebase/firestore";
 import { initializeApp, getApps, getApp } from "firebase/app";
-import { getAuth, createUserWithEmailAndPassword } from "firebase/auth"; 
+import { getAuth, createUserWithEmailAndPassword, updateProfile } from "firebase/auth"; 
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 
-// 1. We need your Firebase Config here explicitly to create a Secondary App
-// (Copy this from your firebase.ts file or .env)
+// 1. Firebase Config (Explicitly needed for Secondary App)
 const firebaseConfig = {
     apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
     authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
@@ -22,14 +21,29 @@ export default function AddUser() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   
+  // 2. Updated State with Phone and Address
   const [formData, setFormData] = useState({
     name: "",
     email: "",
-    password: "", // You set the initial password
-    role: "student", // or 'faculty'
-    grade: "Class 10", // Only for students
-    department: "Science", // Only for faculty
+    password: "",
+    phone: "",       // <--- NEW
+    address: "",     // <--- NEW
+    role: "student",
+    grade: "Class 10",
+    department: "Math",
   });
+
+  // 3. Updated Dropdown Lists
+  const gradeOptions = [
+    "Class 6", "Class 7", "Class 8", "Class 9", "Class 10",
+    "Class 11 (JEE)", "Class 11 (NEET)",
+    "Class 12 (JEE)", "Class 12 (NEET)"
+  ];
+
+  const departmentOptions = [
+    "Math", "Science", "Social Science", "English",
+    "Physics", "Chemistry", "Biology"
+  ];
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -37,8 +51,7 @@ export default function AddUser() {
 
     let secondaryApp;
     try {
-        // A. INITIALIZE SECONDARY APP (To avoid logging out Admin)
-        // We check if a secondary app named "secondary" already exists, otherwise create it
+        // A. INITIALIZE SECONDARY APP
         if (getApps().length > 1) {
              secondaryApp = getApps().find(app => app.name === "secondary");
              if(!secondaryApp) secondaryApp = initializeApp(firebaseConfig, "secondary");
@@ -51,15 +64,23 @@ export default function AddUser() {
         // B. CREATE USER in Authentication
         const userCredential = await createUserWithEmailAndPassword(secondaryAuth, formData.email, formData.password);
         const newUser = userCredential.user;
+        
+        // (Optional) Update the Auth Profile Name immediately
+        await updateProfile(newUser, { displayName: formData.name });
 
-        // C. CREATE DOCUMENT in Firestore (Using the MAIN db instance)
+        // C. CREATE DOCUMENT in Firestore (Adding Phone & Address)
         await setDoc(doc(db, "users", newUser.uid), {
+            uid: newUser.uid,
             name: formData.name,
             email: formData.email,
+            phone: formData.phone,      // <--- Saved
+            address: formData.address,  // <--- Saved
             role: formData.role,
+            
             // Add extra fields based on role
             ...(formData.role === 'student' && { grade: formData.grade, enrolledCourseIds: [] }),
             ...(formData.role === 'faculty' && { department: formData.department }),
+            
             createdAt: new Date(),
             createdByAdmin: true
         });
@@ -67,21 +88,22 @@ export default function AddUser() {
         alert(`✅ Account Created!\n\nEmail: ${formData.email}\nPassword: ${formData.password}\n\nShare these credentials with the user.`);
         
         // Reset Form
-        setFormData({ ...formData, name: "", email: "", password: "" });
+        setFormData({ 
+            name: "", email: "", password: "", phone: "", address: "", 
+            role: "student", grade: "Class 10", department: "Math" 
+        });
 
     } catch (error: any) {
         console.error("Error creating user:", error);
         alert("Failed: " + error.message);
     } finally {
         setLoading(false);
-        // Note: We don't delete the secondary app here to keep it cached, 
-        // but normally you might clean it up.
     }
   };
 
   return (
     <div className="min-h-screen bg-slate-900 text-white flex items-center justify-center p-4">
-      <div className="max-w-2xl w-full bg-slate-800 p-8 rounded-2xl border border-slate-700 shadow-xl">
+      <div className="max-w-3xl w-full bg-slate-800 p-8 rounded-2xl border border-slate-700 shadow-xl">
         
         <div className="flex justify-between items-center mb-8">
             <h1 className="text-2xl font-bold">👤 Register New User</h1>
@@ -106,7 +128,7 @@ export default function AddUser() {
                 </button>
             </div>
 
-            {/* Common Fields */}
+            {/* Row 1: Name & Phone */}
             <div className="grid md:grid-cols-2 gap-6">
                 <div>
                     <label className="block text-sm text-slate-400 mb-1">Full Name</label>
@@ -116,55 +138,73 @@ export default function AddUser() {
                     />
                 </div>
                 <div>
+                    <label className="block text-sm text-slate-400 mb-1">Phone Number</label>
+                    <input type="tel" required 
+                        placeholder="e.g. 98765 43210"
+                        className="w-full bg-slate-900 border border-slate-700 rounded p-2 focus:border-blue-500 outline-none"
+                        value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})}
+                    />
+                </div>
+            </div>
+
+            {/* Row 2: Email & Password */}
+            <div className="grid md:grid-cols-2 gap-6">
+                <div>
                     <label className="block text-sm text-slate-400 mb-1">Email</label>
                     <input type="email" required 
                         className="w-full bg-slate-900 border border-slate-700 rounded p-2 focus:border-blue-500 outline-none"
                         value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})}
                     />
                 </div>
+                <div>
+                    <label className="block text-sm text-slate-400 mb-1">Set Password</label>
+                    <input type="text" required minLength={6}
+                        placeholder="Create a strong password..."
+                        className="w-full bg-slate-900 border border-slate-700 rounded p-2 focus:border-blue-500 outline-none font-mono"
+                        value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})}
+                    />
+                </div>
             </div>
 
-            {/* Password */}
+            {/* Row 3: Address (Full Width) */}
             <div>
-                <label className="block text-sm text-slate-400 mb-1">Set Password</label>
-                <input type="text" required minLength={6}
-                    placeholder="Create a strong password..."
-                    className="w-full bg-slate-900 border border-slate-700 rounded p-2 focus:border-blue-500 outline-none font-mono"
-                    value={formData.password} onChange={e => setFormData({...formData, password: e.target.value})}
+                <label className="block text-sm text-slate-400 mb-1">Residential Address</label>
+                <textarea required rows={2}
+                    placeholder="Flat No, Street, City, State..."
+                    className="w-full bg-slate-900 border border-slate-700 rounded p-2 focus:border-blue-500 outline-none resize-none"
+                    value={formData.address} onChange={e => setFormData({...formData, address: e.target.value})}
                 />
             </div>
 
-            {/* Conditional Fields based on Role */}
+            {/* Conditional Fields based on Role with UPDATED DROPDOWNS */}
             {formData.role === 'student' ? (
                 <div>
-                    <label className="block text-sm text-slate-400 mb-1">Assign Class/Grade</label>
+                    <label className="block text-sm text-blue-400 mb-1 font-bold">Assign Class/Grade</label>
                     <select 
-                        className="w-full bg-slate-900 border border-slate-700 rounded p-2 outline-none"
+                        className="w-full bg-slate-900 border border-slate-700 rounded p-3 outline-none"
                         value={formData.grade} onChange={e => setFormData({...formData, grade: e.target.value})}
                     >
-                        <option>Class 9</option>
-                        <option>Class 10</option>
-                        <option>Class 11 (Science)</option>
-                        <option>Class 12 (Science)</option>
+                        {gradeOptions.map(opt => (
+                            <option key={opt} value={opt}>{opt}</option>
+                        ))}
                     </select>
                 </div>
             ) : (
                 <div>
-                    <label className="block text-sm text-slate-400 mb-1">Department</label>
+                    <label className="block text-sm text-purple-400 mb-1 font-bold">Department</label>
                     <select 
-                        className="w-full bg-slate-900 border border-slate-700 rounded p-2 outline-none"
+                        className="w-full bg-slate-900 border border-slate-700 rounded p-3 outline-none"
                         value={formData.department} onChange={e => setFormData({...formData, department: e.target.value})}
                     >
-                        <option>Science</option>
-                        <option>Mathematics</option>
-                        <option>English</option>
-                        <option>Social Studies</option>
+                        {departmentOptions.map(opt => (
+                            <option key={opt} value={opt}>{opt}</option>
+                        ))}
                     </select>
                 </div>
             )}
 
-            <button type="submit" disabled={loading} className="w-full bg-green-600 hover:bg-green-500 py-3 rounded-lg font-bold disabled:opacity-50">
-                {loading ? "Creating Account..." : "Create User & Save"}
+            <button type="submit" disabled={loading} className={`w-full py-4 rounded-lg font-bold shadow-lg mt-4 disabled:opacity-50 transition ${formData.role === 'student' ? 'bg-blue-600 hover:bg-blue-500' : 'bg-purple-600 hover:bg-purple-500'}`}>
+                {loading ? "Creating Account..." : `Create ${formData.role === 'student' ? 'Student' : 'Faculty'} Account`}
             </button>
 
         </form>

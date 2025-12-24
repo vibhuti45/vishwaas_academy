@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { db } from "@/lib/firebase";
-import { collection, getDocs, query } from "firebase/firestore"; // REMOVED 'orderBy'
+import { collection, getDocs, query, doc, deleteDoc } from "firebase/firestore";
 import Link from "next/link";
 
 export default function UserDirectory() {
@@ -11,35 +11,47 @@ export default function UserDirectory() {
   const [searchTerm, setSearchTerm] = useState("");
 
   useEffect(() => {
-    const fetchUsers = async () => {
-      try {
-        // FIX: Removed orderBy("createdAt") so we don't hide users missing that field
-        const q = query(collection(db, "users")); 
-        const snapshot = await getDocs(q);
-        const list: any[] = [];
-        snapshot.forEach(doc => list.push({ id: doc.id, ...doc.data() }));
-        
-        console.log("Fetched Users:", list); 
-        setUsers(list);
-      } catch (error) {
-        console.error("Error fetching users:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
     fetchUsers();
   }, []);
 
+  const fetchUsers = async () => {
+    try {
+      setLoading(true);
+      const q = query(collection(db, "users")); 
+      const snapshot = await getDocs(q);
+      const list: any[] = [];
+      snapshot.forEach(doc => list.push({ id: doc.id, ...doc.data() }));
+      setUsers(list);
+    } catch (error) {
+      console.error("Error fetching users:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // --- DELETE USER FUNCTION ---
+  const handleDeleteUser = async (userId: string, userName: string) => {
+    const confirmDelete = window.confirm(`⚠️ DANGER: Are you sure you want to delete "${userName}"?\n\nThis action cannot be undone. The user will lose access immediately.`);
+    
+    if (confirmDelete) {
+        try {
+            await deleteDoc(doc(db, "users", userId));
+            // Remove from local list to update UI instantly
+            setUsers(users.filter(u => u.id !== userId));
+            alert(`${userName} has been deleted.`);
+        } catch (error) {
+            console.error("Error deleting user:", error);
+            alert("Failed to delete user.");
+        }
+    }
+  };
+
   // --- FILTER LOGIC ---
   const filteredUsers = users.filter(user => {
-    // 1. Clean the data
     const userRole = (user.role || "").toLowerCase().trim(); 
     const targetRole = activeTab.toLowerCase().trim();
-    
-    // 2. Compare
     const matchesRole = userRole === targetRole;
     
-    // 3. Search Filter
     const searchLower = searchTerm.toLowerCase();
     const nameMatch = (user.name || "").toLowerCase().includes(searchLower);
     const emailMatch = (user.email || "").toLowerCase().includes(searchLower);
@@ -74,17 +86,11 @@ export default function UserDirectory() {
         
         {/* TABS */}
         <div className="flex gap-4 mb-6 border-b border-slate-800 pb-1">
-            <button 
-                onClick={() => setActiveTab("student")}
-                className={`pb-3 px-2 font-medium transition relative ${activeTab === 'student' ? 'text-blue-400' : 'text-slate-400 hover:text-slate-200'}`}
-            >
+            <button onClick={() => setActiveTab("student")} className={`pb-3 px-2 font-medium transition relative ${activeTab === 'student' ? 'text-blue-400' : 'text-slate-400 hover:text-slate-200'}`}>
                 Students ({studentCount})
                 {activeTab === 'student' && <span className="absolute bottom-0 left-0 w-full h-0.5 bg-blue-400"></span>}
             </button>
-            <button 
-                onClick={() => setActiveTab("faculty")}
-                className={`pb-3 px-2 font-medium transition relative ${activeTab === 'faculty' ? 'text-purple-400' : 'text-slate-400 hover:text-slate-200'}`}
-            >
+            <button onClick={() => setActiveTab("faculty")} className={`pb-3 px-2 font-medium transition relative ${activeTab === 'faculty' ? 'text-purple-400' : 'text-slate-400 hover:text-slate-200'}`}>
                 Faculty ({facultyCount})
                 {activeTab === 'faculty' && <span className="absolute bottom-0 left-0 w-full h-0.5 bg-purple-400"></span>}
             </button>
@@ -98,16 +104,14 @@ export default function UserDirectory() {
                         <th className="p-4">Name & Email</th>
                         <th className="p-4">{activeTab === 'student' ? 'Grade/Class' : 'Department'}</th>
                         <th className="p-4">Joined On</th>
-                        <th className="p-4 text-right">Status</th>
+                        <th className="p-4 text-right">Actions</th>
                     </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-700/50 text-sm">
                     {loading ? (
                         <tr><td colSpan={4} className="p-8 text-center text-slate-500">Loading...</td></tr>
                     ) : filteredUsers.length === 0 ? (
-                        <tr><td colSpan={4} className="p-8 text-center text-slate-500">
-                            No {activeTab}s found.
-                        </td></tr>
+                        <tr><td colSpan={4} className="p-8 text-center text-slate-500">No {activeTab}s found.</td></tr>
                     ) : (
                         filteredUsers.map((user) => (
                             <tr key={user.id} className="hover:bg-slate-700/30 transition">
@@ -132,13 +136,15 @@ export default function UserDirectory() {
                                     )}
                                 </td>
                                 <td className="p-4 text-slate-400">
-                                    {/* Safe date check */}
-                                    {user.createdAt?.seconds 
-                                        ? new Date(user.createdAt.seconds * 1000).toLocaleDateString() 
-                                        : <span className="text-slate-600 italic">No Date</span>}
+                                    {user.createdAt?.seconds ? new Date(user.createdAt.seconds * 1000).toLocaleDateString() : '-'}
                                 </td>
                                 <td className="p-4 text-right">
-                                    <span className="text-green-400 text-xs bg-green-900/20 px-2 py-1 rounded border border-green-900/50">Active</span>
+                                    <button 
+                                        onClick={() => handleDeleteUser(user.id, user.name)}
+                                        className="bg-red-900/30 hover:bg-red-900/50 text-red-400 px-3 py-1.5 rounded border border-red-900/50 transition text-xs font-bold"
+                                    >
+                                        🗑️ Delete
+                                    </button>
                                 </td>
                             </tr>
                         ))
@@ -146,7 +152,6 @@ export default function UserDirectory() {
                 </tbody>
             </table>
         </div>
-
       </div>
     </div>
   );

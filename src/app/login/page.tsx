@@ -5,6 +5,7 @@ import { auth, db } from "@/lib/firebase";
 import { doc, setDoc, getDoc } from "firebase/firestore";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
+import Link from "next/link";
 
 export default function Login() {
   const [email, setEmail] = useState("");
@@ -109,14 +110,16 @@ export default function Login() {
             </button>
         </form>
 
-        <div className="relative my-6">
+        {/* <div className="relative my-6">
             <div className="absolute inset-0 flex items-center"><div className="w-full border-t border-slate-200"></div></div>
-            <div className="relative flex justify-center text-sm"><span className="px-2 bg-white text-slate-500">Or continue with</span></div>
-        </div>
+            <div className="relative flex justify-center text-sm"><span className="px-2 bg-white text-slate-500">Back to Home</span></div>
+        </div> */}
 
-        <button onClick={handleGoogleLogin} className="w-full bg-white border border-slate-300 text-slate-700 font-semibold py-3 rounded-lg hover:bg-slate-50 flex items-center justify-center gap-2">
-           <span className="text-lg">G</span> Google
-        </button>
+        <div className="mt-6 text-center">
+            <Link href="/" className="text-sm text-slate-500 hover:text-blue-600 transition">
+                &larr; Back to Home
+            </Link>
+        </div>
 
       </div>
     </div>

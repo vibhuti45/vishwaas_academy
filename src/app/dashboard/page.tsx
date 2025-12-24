@@ -139,14 +139,19 @@ export default function StudentDashboard() {
                 {enrolledCourses.length > 0 ? (
                     enrolledCourses.map((course) => (
                         <div key={course.id} className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-md transition group cursor-pointer flex flex-col">
-                            {/* Thumbnail Area */}
+{/* Thumbnail Area */}
                             <div className="h-40 bg-slate-200 relative">
                                 {course.thumbnail ? (
-                                    <Image src={course.thumbnail} alt={course.title} fill className="object-cover" />
+                                    <Image 
+                                        // FIX: Safety check. If path is local (C:\...), use placeholder instead.
+                                        src={course.thumbnail.startsWith("http") ? course.thumbnail : "https://placehold.co/600x400/png"} 
+                                        alt={course.title} 
+                                        fill 
+                                        className="object-cover" 
+                                    />
                                 ) : (
                                     <div className="w-full h-full flex items-center justify-center bg-blue-100 text-blue-300 text-4xl">📚</div>
                                 )}
-                                
                                 {/* Overlay Play Button */}
                                 <Link href={`/classroom/${course.id}`} className="absolute inset-0 bg-black/10 group-hover:bg-black/20 transition flex items-center justify-center">
                                     <div className="w-12 h-12 bg-white rounded-full flex items-center justify-center pl-1 shadow-lg transform group-hover:scale-110 transition">

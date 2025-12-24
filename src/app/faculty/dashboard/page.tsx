@@ -109,11 +109,19 @@ export default function FacultyDashboard() {
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
             {myCourses.map((course) => (
               <div key={course.id} className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition group flex flex-col">
-                {/* Thumbnail */}
-                <div className="h-32 bg-slate-100 relative">
-                   {course.thumbnail && (
-                     <Image src={course.thumbnail} alt={course.title} fill className="object-cover" />
-                   )}
+{/* Thumbnail Area */}
+                            <div className="h-40 bg-slate-200 relative">
+                                {course.thumbnail ? (
+                                    <Image 
+                                        // FIX: Safety check. If path is local (C:\...), use placeholder instead.
+                                        src={course.thumbnail.startsWith("http") ? course.thumbnail : "https://placehold.co/600x400/png"} 
+                                        alt={course.title} 
+                                        fill 
+                                        className="object-cover" 
+                                    />
+                                ) : (
+                                    <div className="w-full h-full flex items-center justify-center bg-blue-100 text-blue-300 text-4xl">📚</div>
+                                )}
                    <div className="absolute top-2 right-2 bg-white/90 px-2 py-1 text-xs font-bold rounded shadow-sm">
                      {course.grade}
                    </div>
