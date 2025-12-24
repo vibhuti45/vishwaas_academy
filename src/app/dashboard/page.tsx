@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
-import { doc, getDoc, collection, getDocs, query, orderBy } from "firebase/firestore";
+import { doc, getDoc, collection, getDocs, query, orderBy, where, limit } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import Image from "next/image";
 import Link from "next/link";
@@ -15,16 +15,17 @@ export default function StudentDashboard() {
   const [studentName, setStudentName] = useState("");
   const [studentGrade, setStudentGrade] = useState("");
   const [enrolledCourses, setEnrolledCourses] = useState<any[]>([]);
-  const [quizResults, setQuizResults] = useState<any[]>([]); // <--- NEW: Store Results
+  const [quizResults, setQuizResults] = useState<any[]>([]);
+  
+  // Announcements State
+  const [announcements, setAnnouncements] = useState<any[]>([]);
 
-  // UI State
-  const [activeTab, setActiveTab] = useState<"classroom" | "results">("classroom"); // <--- NEW: Tab Switching
+  // UI State: Added "announcements" to the tab types
+  const [activeTab, setActiveTab] = useState<"classroom" | "results" | "announcements">("classroom");
 
-  // 1. PROTECT THE ROUTE
+  // 1. PROTECT ROUTE
   useEffect(() => {
-    if (!loading && !user) {
-      router.push("/login");
-    }
+    if (!loading && !user) router.push("/login");
   }, [user, loading, router]);
 
   // 2. FETCH DATA
@@ -35,13 +36,15 @@ export default function StudentDashboard() {
         const docRef = doc(db, "users", user.uid);
         const docSnap = await getDoc(docRef);
         
+        let enrolledIds: string[] = [];
+
         if (docSnap.exists()) {
           const userData = docSnap.data();
           setStudentName(userData.name || user.displayName || "Student");
           setStudentGrade(userData.grade);
+          enrolledIds = userData.enrolledCourseIds || [];
 
-          // B. CHECK ENROLLMENT
-          const enrolledIds = userData.enrolledCourseIds || [];
+          // B. Fetch Enrolled Courses
           if (enrolledIds.length > 0) {
             const myCourses: any[] = [];
             for (const courseId of enrolledIds) {
@@ -54,7 +57,7 @@ export default function StudentDashboard() {
           }
         }
 
-        // C. FETCH QUIZ RESULTS (NEW)
+        // C. Fetch Quiz Results
         try {
             const resultsRef = collection(db, "users", user.uid, "results");
             const q = query(resultsRef, orderBy("date", "desc"));
@@ -62,39 +65,82 @@ export default function StudentDashboard() {
             const resList: any[] = [];
             resSnap.forEach(doc => resList.push({ id: doc.id, ...doc.data() }));
             setQuizResults(resList);
-        } catch (err) {
-            console.error("Error fetching results", err);
-        }
+        } catch (err) { console.error(err); }
+
+        // D. FETCH ANNOUNCEMENTS (Fixed)
+        try {
+            const notifs: any[] = [];
+            
+            // 1. General
+            const qGeneral = query(collection(db, "announcements"), where("targetType", "==", "all"), limit(20));
+            const snapGen = await getDocs(qGeneral);
+            snapGen.forEach(doc => notifs.push({ id: doc.id, ...doc.data() }));
+
+            // 2. Course Specific
+            if (enrolledIds.length > 0) {
+                const safeIds = enrolledIds.slice(0, 10); 
+                const qCourse = query(collection(db, "announcements"), where("targetCourseId", "in", safeIds), limit(20));
+                const snapCourse = await getDocs(qCourse);
+                snapCourse.forEach(doc => notifs.push({ id: doc.id, ...doc.data() }));
+            }
+
+            // 3. Client Sort
+            const sortedNotifs = notifs.sort((a, b) => {
+                const dateA = a.createdAt?.seconds || 0;
+                const dateB = b.createdAt?.seconds || 0;
+                return dateB - dateA;
+            });
+            
+            // 4. Unique Filter
+            const uniqueNotifs = sortedNotifs.filter((v,i,a)=>a.findIndex(t=>(t.id === v.id))===i);
+            setAnnouncements(uniqueNotifs);
+
+        } catch (err) { console.error("Error fetching announcements:", err); }
       }
     };
 
     if (user) fetchData();
   }, [user]);
 
-  
   if (loading) return <div className="min-h-screen flex items-center justify-center text-blue-600 font-bold">Loading...</div>;
   if (!user) return null; 
 
   return (
     <div className="min-h-screen bg-slate-50 flex font-sans">
       
-      {/* --- SIDEBAR --- */}
+      {/* SIDEBAR */}
       <aside className="w-64 bg-white border-r border-slate-200 hidden md:flex flex-col fixed h-full z-10">
         <div className="p-6 flex items-center gap-3 border-b border-slate-100">
            <Image src="/logo.svg" alt="Logo" width={32} height={32} />
            <span className="font-bold text-slate-900 tracking-tight">Vishwaas</span>
         </div>
-        
         <nav className="flex-grow p-4 space-y-2">
-            {/* Tab 1: Classroom */}
+            
+            {/* 1. Classroom Tab */}
             <button 
                 onClick={() => setActiveTab("classroom")}
                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition ${activeTab === "classroom" ? "bg-blue-50 text-blue-700" : "text-slate-600 hover:bg-slate-50"}`}
             >
                 <span>📚</span> My Classroom
             </button>
+
+            {/* 2. Notice Board Tab (NEW) */}
+            <button 
+                onClick={() => setActiveTab("announcements")}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition ${activeTab === "announcements" ? "bg-blue-50 text-blue-700" : "text-slate-600 hover:bg-slate-50"}`}
+            >
+                <div className="flex items-center gap-3 w-full">
+                    <span>🔔</span> Notice Board
+                    {/* Notification Badge */}
+                    {announcements.length > 0 && activeTab !== "announcements" && (
+                        <span className="ml-auto bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
+                            {announcements.length}
+                        </span>
+                    )}
+                </div>
+            </button>
             
-            {/* Tab 2: Test Results */}
+            {/* 3. Results Tab */}
             <button 
                 onClick={() => setActiveTab("results")}
                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg font-medium transition ${activeTab === "results" ? "bg-blue-50 text-blue-700" : "text-slate-600 hover:bg-slate-50"}`}
@@ -102,12 +148,10 @@ export default function StudentDashboard() {
                 <span>🏆</span> Test Results
             </button>
 
-            {/* Placeholders */}
             <button disabled className="w-full flex items-center gap-3 px-4 py-3 text-slate-400 cursor-not-allowed">
                 <span>📝</span> Assignments (Soon)
             </button>
         </nav>
-
         <div className="p-4 border-t border-slate-100">
             <button onClick={logout} className="flex items-center gap-3 px-4 py-3 text-red-600 hover:bg-red-50 w-full rounded-lg font-medium transition">
                 <span>🚪</span> Logout
@@ -115,7 +159,7 @@ export default function StudentDashboard() {
         </div>
       </aside>
 
-      {/* --- MAIN CONTENT AREA --- */}
+      {/* MAIN CONTENT */}
       <main className="flex-grow md:ml-64 min-h-screen">
         
         {/* Mobile Header */}
@@ -126,7 +170,7 @@ export default function StudentDashboard() {
 
         <div className="p-8">
             
-            {/* --- VIEW 1: CLASSROOM --- */}
+            {/* --- TAB 1: CLASSROOM (Clean & Clutter-Free) --- */}
             {activeTab === "classroom" && (
                 <div className="animate-in fade-in duration-500">
                     <div className="mb-8">
@@ -140,6 +184,13 @@ export default function StudentDashboard() {
                         <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
                             <h3 className="text-slate-500 text-sm font-medium uppercase">Enrolled Courses</h3>
                             <p className="text-3xl font-bold text-slate-900 mt-2">{enrolledCourses.length}</p>
+                        </div>
+                        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
+                            <h3 className="text-slate-500 text-sm font-medium uppercase">Active Notices</h3>
+                            {/* Clicking this stat jumps to notices */}
+                            <p onClick={() => setActiveTab("announcements")} className="text-3xl font-bold text-blue-600 mt-2 cursor-pointer hover:underline decoration-blue-300 decoration-2 underline-offset-4">
+                                {announcements.length}
+                            </p>
                         </div>
                         <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
                             <h3 className="text-slate-500 text-sm font-medium uppercase">Tests Taken</h3>
@@ -192,7 +243,6 @@ export default function StudentDashboard() {
                                 No courses found. Wait for Admin to add one!
                             </div>
                         )}
-
                         <Link href="/courses" className="border-2 border-dashed border-slate-300 rounded-2xl flex flex-col items-center justify-center text-slate-400 p-6 hover:border-blue-400 hover:text-blue-500 transition min-h-[300px]">
                             <span className="text-4xl mb-4">+</span>
                             <span className="font-medium">Explore More Courses</span>
@@ -201,11 +251,64 @@ export default function StudentDashboard() {
                 </div>
             )}
 
-            {/* --- VIEW 2: TEST RESULTS --- */}
+            {/* --- TAB 2: NOTICE BOARD (Dedicated View) --- */}
+            {activeTab === "announcements" && (
+                <div className="animate-in fade-in duration-500 max-w-4xl">
+                    <h1 className="text-2xl font-bold text-slate-900 mb-2">🔔 Notice Board</h1>
+                    <p className="text-slate-500 mb-8">Updates from your teachers and the academy.</p>
+
+                    {announcements.length === 0 ? (
+                        <div className="bg-white p-12 rounded-2xl border border-dashed border-slate-300 text-center">
+                            <div className="text-5xl mb-4">📭</div>
+                            <h3 className="text-lg font-bold text-slate-700">All Caught Up!</h3>
+                            <p className="text-slate-400">No new announcements at the moment.</p>
+                        </div>
+                    ) : (
+                        <div className="space-y-4">
+                            {announcements.map((notif) => (
+                                <div key={notif.id} className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition flex flex-col md:flex-row gap-4">
+                                    {/* Icon / Type Indicator */}
+                                    <div className="flex-shrink-0">
+                                        <div className={`w-12 h-12 rounded-full flex items-center justify-center text-2xl ${notif.targetType === 'all' ? 'bg-purple-100 text-purple-600' : 'bg-blue-100 text-blue-600'}`}>
+                                            {notif.targetType === 'all' ? '📢' : '📚'}
+                                        </div>
+                                    </div>
+                                    
+                                    {/* Content */}
+                                    <div className="flex-grow">
+                                        <div className="flex flex-col md:flex-row md:justify-between md:items-start mb-2">
+                                            <h3 className="text-lg font-bold text-slate-900">{notif.title}</h3>
+                                            <span className="text-xs text-slate-400 bg-slate-50 px-2 py-1 rounded">
+                                                {notif.createdAt?.seconds ? new Date(notif.createdAt.seconds * 1000).toLocaleString() : "Just now"}
+                                            </span>
+                                        </div>
+                                        
+                                        <p className="text-slate-600 leading-relaxed">{notif.message}</p>
+                                        
+                                        {/* Tag */}
+                                        <div className="mt-4">
+                                            {notif.targetType === 'course' ? (
+                                                <span className="inline-flex items-center gap-1 text-xs font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded">
+                                                    📚 {notif.targetCourseName || "Course Update"}
+                                                </span>
+                                            ) : (
+                                                <span className="inline-flex items-center gap-1 text-xs font-bold text-purple-600 bg-purple-50 px-2 py-1 rounded">
+                                                    🌍 General Announcement
+                                                </span>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* --- TAB 3: TEST RESULTS --- */}
             {activeTab === "results" && (
                 <div className="animate-in fade-in duration-500">
                     <h1 className="text-2xl font-bold text-slate-900 mb-6">🏆 Your Performance Report</h1>
-                    
                     {quizResults.length === 0 ? (
                         <div className="bg-white p-12 rounded-2xl border border-dashed border-slate-300 text-center">
                             <p className="text-slate-400 mb-4">You haven't taken any tests yet.</p>

@@ -101,6 +101,7 @@ export default function AdminDashboard() {
             <Link href="/admin/create-course"><button className="bg-blue-600 hover:bg-blue-500 text-white px-6 py-3 rounded-lg font-semibold transition">+ Create New Course</button></Link>
             <Link href="/admin/add-user"><button className="bg-slate-800 hover:bg-slate-700 text-white px-6 py-3 rounded-lg font-semibold transition">+ Register User</button></Link>
             <Link href="/admin/enroll"><button className="bg-green-600 hover:bg-green-500 text-white px-6 py-3 rounded-lg font-semibold transition">+ Enroll Student</button></Link>
+            <Link href="/admin/announcements"><button className="bg-purple-600 hover:bg-purple-500 text-white px-6 py-3 rounded-lg font-semibold transition">📢 Post Announcement</button></Link>
             <Link href="/admin/users">
                 <button className="bg-slate-700 hover:bg-slate-600 text-white px-6 py-3 rounded-lg font-semibold transition flex items-center gap-2">
                     <span>👥</span> View All Users
